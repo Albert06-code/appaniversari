@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bucket List — Aniversari</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body id="bucketlist">
+  <nav class="topnav">
+    <div class="nav-inner">
+      <a class="brand" href="index.html">T'estimo</a>
+      <div class="links">
+        <a href="index.html">Inici</a>
+        <a href="gallery.html">Galeria</a>
+        <a href="memories.html">Cartes</a>
+        <a href="bucketlist.html">Bucket List</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="bucket-list-section">
+      <h2>La nostra Bucket List</h2>
+      <p class="lead">Totes les aventures que volem viure junts ✨</p>
+      
+      <div class="bucket-add-form">
+        <input type="text" id="newActivity" placeholder="Afegeix una nova activitat..." />
+        <button class="btn" id="addBtn">Afegir</button>
+      </div>
+
+      <div class="bucket-filters">
+        <button class="filter-btn active" data-filter="all">Totes</button>
+        <button class="filter-btn" data-filter="pending">Pendents</button>
+        <button class="filter-btn" data-filter="completed">Completades</button>
+      </div>
+
+      <div id="bucketList" class="bucket-items"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Les nostres aventures junts 💖</p>
+  </footer>
+
+  <script>
+    (function(){
+      const STORAGE_KEY = 'bucketListItems';
+      const list = document.getElementById('bucketList');
+      const input = document.getElementById('newActivity');
+      const addBtn = document.getElementById('addBtn');
+      
+      // Sample initial items
+      let items = [
+        { id: Date.now() + 1, text: 'Viatjar a Japó', completed: false },
+        { id: Date.now() + 2, text: 'Fer paracaigudisme', completed: false },
+        { id: Date.now() + 3, text: 'Celebrar molts aniversaris més junts', completed: false },
+        { id: Date.now() + 4, text: 'Anar a veure l\'aurora boreal', completed: false },
+        { id: Date.now() + 5, text: 'Fer un roadtrip per Europa', completed: false }
+      ];
+
+      // Load from localStorage or use sample data
+      function loadItems(){
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if(stored){
+          try{ items = JSON.parse(stored); }
+          catch(e){ items = []; }
+        }
+      }
+
+      function saveItems(){
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      }
+
+      function renderItems(filter = 'all'){
+        list.innerHTML = '';
+        let filtered = items;
+        
+        if(filter === 'pending') filtered = items.filter(i => !i.completed);
+        if(filter === 'completed') filtered = items.filter(i => i.completed);
+
+        if(filtered.length === 0){
+          list.innerHTML = '<p class="empty-state">No hi ha activitats en aquesta categoria.</p>';
+          return;
+        }
+
+        filtered.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'bucket-item' + (item.completed ? ' completed' : '');
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = item.completed;
+          checkbox.className = 'bucket-checkbox';
+          checkbox.addEventListener('change', () => toggleItem(item.id));
+          
+          const text = document.createElement('span');
+          text.className = 'bucket-text';
+          text.textContent = item.text;
+          text.contentEditable = true;
+          text.addEventListener('blur', (e) => updateItem(item.id, e.target.textContent));
+          
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'bucket-delete';
+          deleteBtn.textContent = '✕';
+          deleteBtn.setAttribute('aria-label', 'Eliminar');
+          deleteBtn.addEventListener('click', () => deleteItem(item.id));
+          
+          div.appendChild(checkbox);
+          div.appendChild(text);
+          div.appendChild(deleteBtn);
+          list.appendChild(div);
+        });
+      }
+
+      function addItem(){
+        const text = input.value.trim();
+        if(!text) return;
+        
+        items.push({
+          id: Date.now(),
+          text: text,
+          completed: false
+        });
+        
+        input.value = '';
+        saveItems();
+        renderItems(getCurrentFilter());
+      }
+
+      function toggleItem(id){
+        const item = items.find(i => i.id === id);
+        if(item) item.completed = !item.completed;
+        saveItems();
+        renderItems(getCurrentFilter());
+      }
+
+      function updateItem(id, newText){
+        const item = items.find(i => i.id === id);
+        if(item) item.text = newText.trim();
+        saveItems();
+      }
+
+      function deleteItem(id){
+        if(confirm('Segur que vols eliminar aquesta activitat?')){
+          items = items.filter(i => i.id !== id);
+          saveItems();
+          renderItems(getCurrentFilter());
+        }
+      }
+
+      function getCurrentFilter(){
+        const active = document.querySelector('.filter-btn.active');
+        return active ? active.dataset.filter : 'all';
+      }
+
+      // Event listeners
+      addBtn.addEventListener('click', addItem);
+      input.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') addItem();
+      });
+
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          renderItems(e.target.dataset.filter);
+        });
+      });
+
+      // Initialize
+      loadItems();
+      renderItems();
+    })();
+  </script>
+</body>
+</html>
