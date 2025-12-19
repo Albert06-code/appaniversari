@@ -244,6 +244,130 @@ loadMessages();
 
 // Pot afegir més helpers específics per pàgina aquí
 
+/* Background music that continues across pages */
+(function backgroundMusic(){
+  try{
+    const MUSIC_KEY = 'anniv_music_playing';
+    const MUSIC_TIME_KEY = 'anniv_music_time';
+    const MUSIC_URL = 'assets/sparks.mp3';
+    
+    // Create or get audio element
+    if(!window.anniversaryAudio){
+      window.anniversaryAudio = new Audio(MUSIC_URL);
+      window.anniversaryAudio.volume = 0.5;
+      window.anniversaryAudio.loop = true; // La cançó es repeteix
+    }
+    
+    const audio = window.anniversaryAudio;
+    
+    // If music should be playing, start it
+    if(sessionStorage.getItem(MUSIC_KEY) === '1'){
+      const savedTime = parseFloat(sessionStorage.getItem(MUSIC_TIME_KEY)) || 0;
+      audio.currentTime = savedTime;
+      audio.play().catch(e => console.log('Error reproduint àudio:', e));
+      
+      // Update time periodically
+      setInterval(() => {
+        if(!audio.paused){
+          sessionStorage.setItem(MUSIC_TIME_KEY, audio.currentTime.toString());
+        }
+      }, 1000);
+    }
+    
+    // Expose function to start music
+    window.startAnniversaryMusic = function(){
+      sessionStorage.setItem(MUSIC_KEY, '1');
+      sessionStorage.setItem(MUSIC_TIME_KEY, '0');
+      audio.currentTime = 0;
+      audio.play().catch(e => console.log('Error reproduint àudio:', e));
+      
+      // Update time periodically
+      setInterval(() => {
+        if(!audio.paused){
+          sessionStorage.setItem(MUSIC_TIME_KEY, audio.currentTime.toString());
+        }
+      }, 1000);
+    };
+    
+  }catch(e){ console.error('Background music error', e); }
+})();
+
+/* Smooth navigation without page reload to keep music playing */
+(function smoothNavigation(){
+  try{
+    // Intercept all navigation links
+    document.addEventListener('click', function(e){
+      const link = e.target.closest('a[href$=".html"]');
+      if(!link) return;
+      
+      const href = link.getAttribute('href');
+      if(!href || href.startsWith('http')) return;
+      
+      e.preventDefault();
+      
+      // Load page content via fetch
+      fetch(href)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          // Get new body content and id
+          const newBodyId = doc.body.id;
+          const newMain = doc.querySelector('main') || doc.querySelector('body > *:not(nav):not(footer)');
+          const currentMain = document.querySelector('main') || document.querySelector('body > *:not(nav):not(footer)');
+          
+          // Update body id
+          if(newBodyId) document.body.id = newBodyId;
+          
+          // Update main content
+          if(newMain && currentMain){
+            currentMain.innerHTML = newMain.innerHTML;
+            
+            // Re-execute scripts for the new page
+            const scripts = currentMain.querySelectorAll('script');
+            scripts.forEach(oldScript => {
+              const newScript = document.createElement('script');
+              Array.from(oldScript.attributes).forEach(attr => {
+                newScript.setAttribute(attr.name, attr.value);
+              });
+              newScript.textContent = oldScript.textContent;
+              oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+            
+            // Trigger page-specific initialization
+            if(window.initPageContent) window.initPageContent();
+          }
+          
+          // Update active nav link
+          document.querySelectorAll('.topnav a').forEach(a => {
+            a.classList.remove('active');
+            if(a.getAttribute('href') === href) a.classList.add('active');
+          });
+          
+          // Update URL without reload
+          window.history.pushState({page: href}, '', href);
+          
+          // Scroll to top
+          window.scrollTo(0, 0);
+        })
+        .catch(err => {
+          console.error('Error loading page:', err);
+          // Fallback to normal navigation
+          window.location.href = href;
+        });
+    });
+    
+    // Handle back/forward buttons
+    window.addEventListener('popstate', function(e){
+      if(e.state && e.state.page){
+        window.location.reload();
+      }
+    });
+    
+  }catch(e){ console.error('Smooth navigation error', e); }
+})();
+
 /* Entrance gate: modal asking for a secret word before showing content */
 (function entranceGate(){
   try{
@@ -288,6 +412,11 @@ loadMessages();
       overlay.classList.add('eg-hidden');
       setTimeout(()=> overlay.remove(), 450);
       showWelcome();
+      
+      // Inicia la música de fons
+      if(window.startAnniversaryMusic){
+        window.startAnniversaryMusic();
+      }
     }
 
     submit.addEventListener('click', ()=>{
